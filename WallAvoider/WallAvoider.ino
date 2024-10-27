@@ -3,13 +3,14 @@
 Servo servoLeft;                // Declare Left Servo - using servoLeft will determine the velocity of the Left Servo
 Servo servoRight;               // Declare Right Servo - using servoRight will determine the velocity of the Right Servo
 
-// Ultrasonic Initialisation
 // -----------------CAUTION-----------------
 // Current software is made for SEEED studio 
 // ultrasonic sensor, the same digital pin 
 // operates both emitted and echoed signal 
 // when calculating distance. 
 // -----------------------------------------
+
+// Distance Parameters & Initialisation
 const int uSonicSIG1 = 2;       // Set the trigger to pin out 2
 const int uSonicSIG2 = 3;       // Left sensor
 const int uSonicSIG3 = 4;       // Right sensor
@@ -19,6 +20,12 @@ int distanceFRT, distanceLHS, distanceRHS;
 const int thresholdDistanceFRT = 10;        // Provisionally all the same but can be tweaked for performance optimisation.
 const int thresholdDistanceLHS = 10;
 const int thresholdDistanceRHS = 10;
+
+// Robot State Memory
+const int maxMoves = 45;        // Subject to fine tuning
+int moveMemory[maxMoves];       // Reserve data in micro-controller - 32kb max data.
+int moveIndex = 0;              // Iterable value for robot state.
+int junctionIndex = -1;         // Backtrack to junction.
 
 void setup() {
   // Not sure what it does but it makes it work
@@ -45,12 +52,13 @@ void loop() {
   //Serial.print(distanceRHS);
   //Serial.println(" cm");
 
-  delay(500);
+  delay(500);       // Sampling interval in ms
 
   if (distanceFRT > thresholdDistanceFRT) {
 
     forwardMove(1000);
-    Serial.print("Going Forward! \n");
+    //Serial.print("Going Forward! \n");
+    recordMove(1);
   } else {
     stopMove();
     delay(500);
@@ -58,19 +66,89 @@ void loop() {
     // Logic to determine the clear path.
     if (distanceLHS > thresholdDistanceLHS && distanceRHS <= thresholdDistanceRHS) {
       turnLeft(1000);           // Turn Left if its clear
-      Serial.print("TURNING LEFT \n");
+      //Serial.print("TURNING LEFT \n");
+      recordMove(2);
+
     } else if (distanceRHS > thresholdDistanceRHS && distanceLHS <= thresholdDistanceLHS){
       turnRight(1000);          // Turn Right if its clear
-      Serial.print("TURNING RIGHT \n");
+      //Serial.print("TURNING RIGHT \n");
+      recordMove(3);
+
     } else if (distanceLHS <= thresholdDistanceLHS && distanceRHS <= thresholdDistanceRHS) {
-      turnRight(2000);         // Le spin
-      Serial.print("Le Spin \n");
+      backtrackTo(junctionIndex);
+  
+    } else if (distanceLHS > thresholdDistanceLHS && distanceRHS > thresholdDistanceRHS) {
+      // For now turns left only
+      turnLeft(1000);
+      recordMove(4);
+      junctionIndex = moveIndex - 1;
     }
+  }
+}
+
+// -----------------Memory-------------------
+// Ensures the robot can backtrack to previously
+// visited junctions.
+// 1 - Moving forward
+// 2 - Left Clear, Turning Left
+// 3 - Right Clear, Turning Right
+// 4 - Junction detected, Turning Left
+// 5 - Junction detected, Turning Right
+// ------------------------------------------
+void recordMove(int move) {
+  if (moveIndex < maxMoves) {
+    moveMemory[moveIndex] = move;
+    Serial.print("Saved State: ");
+    Serial.print(move);
+    Serial.print("\n");
+    moveIndex++;
+  }
+}
+
+
+// ---------------Backtracking---------------
+// This method allows the robot memory stack
+// to be accessed and modified enabling the robot
+// to go back to the junction that lead it to a 
+// dead-end.
+// 
+// CAUTION:
+// ENSURE SERVO VALUES IN BACKTRACKING METHOD
+// ARE THE SAME AS IN THE GENERAL MAZE EXPLORATION.
+// 
+// ------------------------------------------
+void backtrackTo(int junctionIndex) {
+  while (moveIndex > junctionIndex) {
+    int lastMove = moveMemory[moveIndex];
+
+    // Majority of movements are reversed
+    switch (lastMove) {
+      case 1:
+        forwardMove(1000);        // Kept to forward as robot is assumed to have performed a 180 at dead end.
+        Serial.print("Backtracking: move back");
+      break;
+
+      case 2:
+        turnRight(1000);
+        Serial.print("Backtracking: turn right");
+      break;
+
+      case 3:
+        turnLeft(1000);
+        Serial.print("Backtracking: turn left");
+      break;
+
+      case 4:
+        turnLeft(2000);
+        Serial.print("Backtracking: back out of dead-end");
+    }
+
+    moveMemory[moveIndex] = 0;
+    moveIndex--;
 
     delay(500);
   }
 }
-
 
 // -----------------Movement-----------------
 // This current version of the code has flipped
@@ -109,7 +187,7 @@ void turnRight(int microsecondTime) {
   servoRight.writeMicroseconds(1700);   // Right Servo rotates anti-clockwise
   delay(microsecondTime);               // Move time in microseconds
 }
-
+ 
 void pivotForwardLeft(int microsecondTime) {
   servoLeft.writeMicroseconds(1500);    // Left Servo stationary
   servoRight.writeMicroseconds(1300);   // Right Servo rotates clockwise
