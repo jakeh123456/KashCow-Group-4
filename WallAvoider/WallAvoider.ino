@@ -27,9 +27,17 @@ int moveMemory[maxMoves];       // Reserve data in micro-controller - 32kb max d
 int moveIndex = 0;              // Iterable value for robot state.
 int junctionIndex = -1;         // Backtrack to junction.
 
+// Solving Bias
+// 0 - Left Bias
+// 1 - Right Bias
+int turnBias = 0;
+
+
+
 void setup() {
   // Not sure what it does but it makes it work
   attachServos();
+  
   
   Serial.begin(9600);           // Sets baud rate.
 }
@@ -61,7 +69,7 @@ void loop() {
     recordMove(1);
   } else {
     stopMove();
-    delay(500);
+    delay(500); // Most likely junction detected, else a dead-end.
 
     // Logic to determine the clear path.
     if (distanceLHS > thresholdDistanceLHS && distanceRHS <= thresholdDistanceRHS) {
@@ -75,13 +83,18 @@ void loop() {
       recordMove(3);
 
     } else if (distanceLHS <= thresholdDistanceLHS && distanceRHS <= thresholdDistanceRHS) {
-      backtrackTo(junctionIndex);
+      backtrackTo(junctionIndex); // Dead-end detected.
+      recordMove(4);
   
     } else if (distanceLHS > thresholdDistanceLHS && distanceRHS > thresholdDistanceRHS) {
-      // For now turns left only
-      turnLeft(1000);
-      recordMove(4);
-      junctionIndex = moveIndex - 1;
+      junctionIndex = moveIndex;
+      if (turnBias == 0) {
+        turnLeft(1000);
+        recordMove(5);            // Junction Detected, turning left.
+      } else if (turnBias == 1) {
+        turnRight(1000);
+        recordMove(6);            // Junction Detected, turning right.
+      }
     }
   }
 }
@@ -89,11 +102,13 @@ void loop() {
 // -----------------Memory-------------------
 // Ensures the robot can backtrack to previously
 // visited junctions.
+// 0 - Unused, free slot
 // 1 - Moving forward
 // 2 - Left Clear, Turning Left
 // 3 - Right Clear, Turning Right
-// 4 - Junction detected, Turning Left
-// 5 - Junction detected, Turning Right
+// 4 - Dead-end detected, backtracking
+// 5 - Junction detected, Turning Left
+// 6 - Junction detected, Turning Right
 // ------------------------------------------
 void recordMove(int move) {
   if (moveIndex < maxMoves) {
@@ -113,7 +128,7 @@ void recordMove(int move) {
 // dead-end.
 // 
 // CAUTION:
-// ENSURE SERVO VALUES IN BACKTRACKING METHOD
+// ENSURE SERVO SPIN VALUES IN BACKTRACKING METHOD
 // ARE THE SAME AS IN THE GENERAL MAZE EXPLORATION.
 // 
 // ------------------------------------------
@@ -140,7 +155,15 @@ void backtrackTo(int junctionIndex) {
 
       case 4:
         turnLeft(2000);
-        Serial.print("Backtracking: back out of dead-end");
+        Serial.print("Backtracking: leaving dead-end");
+      break;
+
+      case 5:
+      break;
+
+      case 6:
+      break;
+      // Compensates for existance of values 5 & 6 but no response required.
     }
 
     moveMemory[moveIndex] = 0;
