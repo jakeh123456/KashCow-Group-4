@@ -5,10 +5,8 @@ Servo servoLeft;                // Declare Left Servo - using servoLeft will det
 Servo servoRight;               // Declare Right Servo - using servoRight will determine the velocity of the Right Servo
 
 // -----------------CAUTION-----------------
-// Current software is made for SEEED studio 
-// ultrasonic sensor, the same digital pin 
-// operates both emitted and echoed signal 
-// when calculating distance. 
+// This code uses HC SR04 sensors instead 
+// of SEED 
 // -----------------------------------------
 
 // Distance Parameters & Initialisation
