@@ -23,6 +23,20 @@ const double thresholdDistanceRHS = 13.0;
 // 1 - Right Bias
 int turnBias = 1;
 
+// Backtracking Flag
+bool backtrackingBool = false;
+
+// Junction detection
+int junctionIndex = 0;
+
+// Movement Memory
+const int maxMoves = 100;
+struct Move {
+  // Structure stores the state carried out and respective --for now, time duration.
+  int action;
+  int duration; // in ms
+}
+
 
 void setup() {
   attachServos();
@@ -30,9 +44,17 @@ void setup() {
 }
 
 void loop() {
+  if (backtrackingBool == true) {
+    backtrackTo();
+  } else {
+    navigateMaze();
+  }
+}
+
+void navigateMaze() {
     // Reset the movedForward flag at the beginning of each cycle
     bool movedForward = false;
-    Serial.println("LOOP START");
+    Serial.println("NAVIGATION START");
 
     // Read initial sensor values
     distanceFRT = hc.dist(0);
@@ -44,6 +66,9 @@ void loop() {
 
     // While loop to move forward while the front distance is greater than the threshold
     while (distanceFRT > thresholdDistanceFRT) {
+        // -------- Micro Movements --------
+        // Not stored in move mem as it is too small of a change to dictate the robot's behavior
+
         distanceLHS = hc.dist(1);
         if (distanceLHS > 1.0 && distanceLHS < 3.8) //Possible change to 0.1 and 3.8
         {
@@ -58,7 +83,9 @@ void loop() {
                 distanceRHS = hc.dist(2);
                 Serial.print("Turning Left to avoid obstacle");
         }
+
         forwardMove(100);
+        recordMove(1, 100);
         distanceFRT = hc.dist(0);
         Serial.print("DistanceFRT: ");
         Serial.println(distanceFRT);
@@ -80,16 +107,21 @@ void loop() {
         // Logic to determine the clear path
         if ((distanceLHS > thresholdDistanceLHS) && (distanceRHS <= thresholdDistanceRHS)) { // works well after threshold change
             turnLeft(600);           // Turn Left if it's clear for battery(600) and usb(800)
+            recordMove(2, 600);
                 Serial.print("LOGIC : Turning Left");
         } else if ((distanceRHS > thresholdDistanceRHS) && (distanceLHS <= thresholdDistanceLHS)) {
             turnRight(600);          // Turn Right if it's clear
+            recordMove(3, 600);
                 Serial.print("LOGIC : Turning Right");
         } else if ((distanceLHS > thresholdDistanceLHS) && (distanceRHS > thresholdDistanceRHS)) {
+            junctionIndex = moveIndex;
             if (turnBias == 0) {
                 turnLeft(600);
+                recordMove(5, 600);
                 Serial.print("Junction Detected, turning left");
             } else if (turnBias == 1) {
                 turnRight(600);
+                recordMove(6, 600);
                 Serial.print("Junction Detected, turning right");
             }
             Serial.print(" LHS: ");
@@ -104,10 +136,104 @@ void loop() {
             Serial.print(distanceLHS);
             Serial.print(", RHS: ");
             Serial.println(distanceRHS);
+
+            // Dead-end was detected hence backtracking is the only way out.
+            recordMove(4, 0)
+            backtrackTo(junctionIndex);
+            backtrackingBool = true;
         }
     }
 }
 
+// -----------------Memory-------------------
+// Description: 
+//    Ensures the robot can backtrack to previously
+// visited junctions.
+//
+// States: 
+// 0 - Unused, free slot
+// 1 - Moving forward
+// 2 - Left Clear, Turning Left
+// 3 - Right Clear, Turning Right
+// 4 - Dead-end detected, backtracking
+// 5 - Junction detected, Turning Left
+// 6 - Junction detected, Turning Right
+// ------------------------------------------
+void recordMove(int action, int duration) {
+  if (moveIndex < maxMoves) {
+    moveMemory[moveIndex++] = {action, duration}
+    Serial.print("Saved Action: ");
+    Serial.print(action);
+    Serial.print("\n");
+    moveIndex++;
+  } else {
+    Serial.prinln("Memory Full ! ")
+  }
+}
+
+// ---------------Backtracking---------------
+// This method allows the robot memory stack
+// to be accessed and modified enabling the robot
+// to go back to the junction that lead it to a 
+// dead-end.
+// 
+// Note:
+// By accessing struct .duration data there is no
+// need to match the servo speeds globally, hence
+// even outside the function.
+// ------------------------------------------
+void backtrackTo(int junctionIndex) {
+  while (moveIndex > junctionIndex) {
+    moveIndex--;
+    Move lastMove = moveMemory[moveIndex];
+
+    // Majority of movements are reversed
+    switch (lastMove.action) {
+      case 1:
+        forwardMove(lastMove.duration);
+        Serial.print("Backtracking: move back");
+      break;
+
+      case 2:         // 2 - Left was stored as clear, since it spun on itself, right and left will be mirrored when backtracking.
+        turnRight(lastMove.duration)
+        Serial.print("Backtracking: turn right");
+      break;
+
+      case 3:
+        turnLeft(lastMove.duration);
+        Serial.print("Backtracking: turn left");
+      break;
+
+      case 4:
+        turnLeft(1200);           // Assuming linear servo spin value, 600 - 90deg, 1200 -180deg
+        Serial.print("Backtracking: back out of dead-end");
+        Serial.print("Backtracking: leaving dead-end");
+      break;
+
+     default:
+        Serial.println("Unknown Backtracking action");
+      break;
+      // Compensates for existance of values 5 & 6 but no response required.
+    }
+
+    moveMemory[moveIndex] = 0;      // Set memory slot back to zero
+    moveIndex--;                    // Decrease index by one
+
+    // delay(500);                  // Present in initial code, not sure if needed now, so comment it is.
+  }
+}
+
+// --------------NEW Movement----------------
+// Description: 
+//    Below lies the functions related to the robot's movement
+// and all associated servo functionalities.
+// The new movement works as a function dependent on millis(),
+// which does not stop break out the time sequence of robot states as
+// opposed to the previously used delay() functions. 
+// 
+// TL:DR
+//    uses millis(), non blocking to other systems as opposed to delay()
+// ------------------------------------------
 void attachServos() {
   servoLeft.attach(12);         // Left signal connects to pin 12
   servoRight.attach(13);        // Right signal connects to pin 13
