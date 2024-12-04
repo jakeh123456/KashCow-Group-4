@@ -22,7 +22,7 @@ const double thresholdDistanceRHS = 13.0;
 // 0 - Left Bias
 // 1 - Right Bias
 short turnBias;
-short deadEnd;
+short deadEnd = -1;               // Initially no dead ends pointed to.
 
 // Movement Memory
 const int maxMoves = 100;
@@ -42,6 +42,7 @@ struct Move {
   int duration; // in ms
 };
 
+Move moveMemory[maxMoves];
 
 void setup() {
 
@@ -165,13 +166,13 @@ void loop() {
 // ------------------------------------------
 void recordMove(int action, int duration) {
   if (moveIndex < maxMoves) {
-    Move[moveIndex++] = {action, duration}
+    moveMemory[moveIndex++] = {action, duration};
     Serial.print("Saved Action: ");
     Serial.print(action);
     Serial.print("\n");
     moveIndex++;
   } else {
-    Serial.prinln("Memory Full ! ")
+    Serial.print("Memory Full ! ");
   }
 }
 
@@ -189,7 +190,7 @@ void recordMove(int action, int duration) {
 void backtrackTo(int junctionIndex) {
   while (moveIndex > junctionIndex) {
     moveIndex--;
-    Move lastMove = Move[moveIndex];
+    Move lastMove = moveMemory[moveIndex];
 
     // Majority of movements are reversed
     switch (lastMove.action) {
@@ -199,7 +200,7 @@ void backtrackTo(int junctionIndex) {
       break;
 
       case 2:         // 2 - Left was stored as clear, since it spun on itself, right and left will be mirrored when backtracking.
-        turnRight(lastMove.duration)
+        turnRight(lastMove.duration);
         Serial.print("Backtracking: turn right");
       break;
 
@@ -220,10 +221,10 @@ void backtrackTo(int junctionIndex) {
       // Compensates for existance of values 5 & 6 but no response required.
     }
 
-    Move[moveIndex] = 0;      // Set memory slot back to zero
-    moveIndex--;                    // Decrease index by one
+    moveMemory[moveIndex] = {0,0};      // Clear memory @ index back to zero
+    moveIndex--;                        // Decrease index by one
 
-    // delay(500);                  // Present in initial code, not sure if needed now, so comment it is.
+    // delay(500);                      // Present in initial code, not sure if needed now, so comment it is.
   }
 }
 
