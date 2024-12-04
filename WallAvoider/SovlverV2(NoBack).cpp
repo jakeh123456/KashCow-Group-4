@@ -21,16 +21,19 @@ const double thresholdDistanceRHS = 13.0;
 // Solving Bias
 // 0 - Left Bias
 // 1 - Right Bias
-int turnBias = 1;
-
-// Backtracking Flag
-bool backtrackingBool = false;
-
-// Junction detection
-int junctionIndex = 0;
+short turnBias;
+short deadEnd;
 
 // Movement Memory
 const int maxMoves = 100;
+
+// Backtracking Flag
+  bool backtrackingBool = false;
+
+// Junction detection
+  int junctionIndex = 0;
+  int fwdcounter = 0;
+
 struct Move {
   // Structure stores the state carried out and respective --for now, time duration.
   int action;
@@ -39,19 +42,14 @@ struct Move {
 
 
 void setup() {
+
+
+  // Default config
   attachServos();
   Serial.begin(9600);           // Sets baud rate.
 }
 
 void loop() {
-  if (backtrackingBool == true) {
-    backtrackTo();
-  } else {
-    navigateMaze();
-  }
-}
-
-void navigateMaze() {
     // Reset the movedForward flag at the beginning of each cycle
     bool movedForward = false;
     Serial.println("NAVIGATION START");
@@ -85,7 +83,7 @@ void navigateMaze() {
         }
 
         forwardMove(100);
-        recordMove(1, 100);
+        fwdcounter++;
         distanceFRT = hc.dist(0);
         Serial.print("DistanceFRT: ");
         Serial.println(distanceFRT);
@@ -94,6 +92,9 @@ void navigateMaze() {
         stopMove();
         Serial.println("EXITED WHILE LOOP ");
         delay(1000);                               // DEBUG: Delay just to see visually 
+        fwdtime = fwdcounter * 100;                // Avoids overflowing memory.
+        recordMove(1, fwdtime);
+        fwdcounter = 0;
         
     // If the while loop was not executed, handle the alternative logic
     if (!movedForward) {
@@ -141,6 +142,7 @@ void navigateMaze() {
             recordMove(4, 0)
             backtrackTo(junctionIndex);
             backtrackingBool = true;
+            deadEnd = turnBias;
         }
     }
 }
