@@ -32,13 +32,15 @@ const int maxMoves = 100;
 
 // Junction detection
   int junctionIndex = 0;
+  int moveIndex = 0;
   int fwdcounter = 0;
+  double fwdtime;
 
 struct Move {
   // Structure stores the state carried out and respective --for now, time duration.
   int action;
   int duration; // in ms
-}
+};
 
 
 void setup() {
@@ -139,7 +141,7 @@ void loop() {
             Serial.println(distanceRHS);
 
             // Dead-end was detected hence backtracking is the only way out.
-            recordMove(4, 0)
+            recordMove(4, 0);
             backtrackTo(junctionIndex);
             backtrackingBool = true;
             deadEnd = turnBias;
@@ -163,7 +165,7 @@ void loop() {
 // ------------------------------------------
 void recordMove(int action, int duration) {
   if (moveIndex < maxMoves) {
-    moveMemory[moveIndex++] = {action, duration}
+    Move[moveIndex++] = {action, duration}
     Serial.print("Saved Action: ");
     Serial.print(action);
     Serial.print("\n");
@@ -187,7 +189,7 @@ void recordMove(int action, int duration) {
 void backtrackTo(int junctionIndex) {
   while (moveIndex > junctionIndex) {
     moveIndex--;
-    Move lastMove = moveMemory[moveIndex];
+    Move lastMove = Move[moveIndex];
 
     // Majority of movements are reversed
     switch (lastMove.action) {
@@ -218,11 +220,27 @@ void backtrackTo(int junctionIndex) {
       // Compensates for existance of values 5 & 6 but no response required.
     }
 
-    moveMemory[moveIndex] = 0;      // Set memory slot back to zero
+    Move[moveIndex] = 0;      // Set memory slot back to zero
     moveIndex--;                    // Decrease index by one
 
     // delay(500);                  // Present in initial code, not sure if needed now, so comment it is.
   }
+}
+
+void runCheck(){
+  while (digitalRead(7) == LOW){}
+  if (digitalRead(8) == HIGH){
+    Serial.write("Run 1");
+    turnBias = 0;}
+  else if (digitalRead(12) == HIGH){
+    Serial.write("Run 2");
+    turnBias = 1;}
+  else if (digitalRead(13) == HIGH){
+    Serial.write("Run 1");
+    if(deadEnd == 0){
+      turnBias = 1;}
+    else if(deadEnd == 1){
+      turnBias = 0;}}
 }
 
 // --------------NEW Movement----------------
