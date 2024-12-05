@@ -189,7 +189,6 @@ void recordMove(int action, int duration) {
 // ------------------------------------------
 void backtrackTo(int junctionIndex) {
   while (moveIndex > junctionIndex) {
-    moveIndex--;
     Move lastMove = moveMemory[moveIndex];
 
     // Majority of movements are reversed
