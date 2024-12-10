@@ -1,0 +1,8 @@
+// idea is to continuously check the wall angle and force the robot to keep a relative angle of 0 with left and right surfaces.
+
+// pseudocode
+float rhsWallTheta // wall angle
+
+void turnRightUntil() {
+       while rhsWallTheta.isclose(1e-3) != 0:
+	turnRight(20) // in ms}
