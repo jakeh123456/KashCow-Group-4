@@ -22,20 +22,28 @@ const double thresholdDistanceRHS = 13.0;
 // 1 - Right Bias
 int turnBias = 1;
 
+// Signal Pre-processing
+double filteredDistanceFRT = 0.0;
+double filteredDistanceLHS = 0.0;
+double filteredDistanceRHS = 0.0;
+const  double default_smoothingFactor = 0.3;
+
 // PID Params
 double drift = 0.0;
 double error = 0.0;
 double prev_error = 0.0;
 double deriv = 0.0;
+double integ = 0;
+double max_integ = 35;
 double correction = 0.0;
 double Kp = 20;           // Over-exaggerated motion
 double Kd = 18;           // A lot of kick
+double Ki = 0;            // TODO find optimal tuning.
 double dt;
 double leftservoVal;
 double rightservoVal;
 double currentTime;
 double previousTime;
-
 
 void setup() {
   attachServos();
@@ -72,8 +80,10 @@ void loop() {
       // -----------------PD Ctrl START-----------------
       // Fetch Side sensor vals
       distanceLHS = hc.dist(1);
+      filteredDistanceLHS = EWMA_Filter(distanceLHS, filteredDistanceLHS, default_smoothingFactor);      // Filtering out noise
       delay(20);
       distanceRHS = hc.dist(2);
+      filteredDistanceRHS = EWMA_Filter(distanceRHS, filteredDistanceRHS, default_smoothingFactor);
       delay(20);
       
       // PID calculations Start
@@ -189,6 +199,10 @@ void stopMove() {
   servoRight.writeMicroseconds(1500);
 }
 
+double EWMA_Filter(double newVal, double prevFilteredVal, double smoothingFactor){
+  return (smoothingFactor * newVal) + ((1-smoothingFactor) * prevFilteredVal);
+}
+
 double PD_correction(double distanceLHS, double distanceRHS) {
   currentTime = millis();
   dt = (double)(currentTime - previousTime);
@@ -197,7 +211,17 @@ double PD_correction(double distanceLHS, double distanceRHS) {
   drift = distanceLHS - distanceRHS;
   error = drift;
   deriv = (error - prev_error) / dt;
-  correction =  (Kd * deriv) + (Kp * error);   // This will determine the servo velocities
+  integ += (error + prev_error) * dt;
+  // Anti-windup - integral clamping.
+  if (integ > max_integ) {
+    integ = max_integ;
+  }
+  else {
+    integ = integ;
+  }
+
+  // PID Value
+  correction =  (Kd * deriv) + (Kp * error) + (Ki * integ);   // This will determine the servo velocities
 
   // Store past values
   prev_error = error;
