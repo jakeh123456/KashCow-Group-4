@@ -21,9 +21,11 @@ HCSR04 hc(3, new int[3]{9,10, 11}, 3); //initialisation class HCSR04 (trig pin ,
 double distanceFRT, distanceLHS, distanceRHS;
 
 const double thresholdDistanceFRT = 24.0;        // The left and right are pretty good now could make the front a bit bigger
-const double 2ndthresholdDistanceFRT = 7.5;
+const double secondthresholdDistanceFRT = 7.5;
 const double thresholdDistanceLHS = 13.0;
 const double thresholdDistanceRHS = 13.0;
+
+const double wallRef = 6.0;
 
 // Solving Bias
 // 0 - Left Bias
@@ -34,7 +36,7 @@ int turnBias = 1;
 double filteredDistanceFRT = 0.0;
 double filteredDistanceLHS = 0.0;
 double filteredDistanceRHS = 0.0;
-const  double default_smoothingFactor = 0.3;
+const double default_smoothingFactor = 0.3;
 
 // PID Params
 double drift = 0.0;
@@ -44,9 +46,13 @@ double deriv = 0.0;
 double integ = 0;
 double max_integ = 35;
 double correction = 0.0;
+
 double Kp = 20;           // Over-exaggerated motion
-double Kd = 18;           // A lot of kick
+double Kd = 8;           // A lot of kick
 double Ki = 0;            // TODO find optimal tuning.
+
+double kp_internal;
+double kd_internal;
 double dt;
 double leftservoVal;
 double rightservoVal;
@@ -140,7 +146,7 @@ void loop() {
 
       movedForward = true;
     }
-    while (distanceFRT > 2ndthresholdDistanceFRT ){
+    while (distanceFRT > secondthresholdDistanceFRT ){
         distanceFRT = hc.dist(0);
         delay(20);
         servoLeft.write(180);
@@ -161,17 +167,17 @@ void loop() {
 
         // Logic to determine the clear path
         if ((distanceLHS > thresholdDistanceLHS) && (distanceRHS <= thresholdDistanceRHS)) { // works well after threshold change
-            turnLeft(600);           // Turn Left if it's clear for battery(600) and usb(800)
+            turnAccurateControl(false, 90);           // Turn Left if it's clear for battery(600) and usb(800)
                 Serial.print("LOGIC : Turning Left");
         } else if ((distanceRHS > thresholdDistanceRHS) && (distanceLHS <= thresholdDistanceLHS)) {
-            turnRight(600);          // Turn Right if it's clear
+            turnAccurateControl(true, 90);
                 Serial.print("LOGIC : Turning Right");
         } else if ((distanceLHS > thresholdDistanceLHS) && (distanceRHS > thresholdDistanceRHS)) {
             if (turnBias == 0) {
-                turnLeft(600);
+                turnAccurateControl(false, 90);
                 Serial.print("Junction Detected, turning left");
             } else if (turnBias == 1) {
-                turnRight(600);
+                turnAccurateControl(true, 90);
                 Serial.print("Junction Detected, turning right");
             }
             Serial.print(" LHS: ");
@@ -180,7 +186,7 @@ void loop() {
             Serial.println(distanceRHS);
         } else {                                                                 // DEBUG: Print sensor values if none of the conditions to see problem (DEAD END CODE GO HERE)
             // Print sensor values if none of the conditions are met
-            turnRight(1000);
+            turnAccurateControl(true, 180);
             Serial.print("No clear path detected. Sensor values - FRT: ");
             Serial.print(distanceFRT);
             Serial.print(", LHS: ");
@@ -213,12 +219,12 @@ void MPU6050Initialise() {// The Serial prints can be commented out later...
   Serial.println(F("Initializing DMP..."));
   devStatus = mpu.dmpInitialize();
   /* Supply your gyro offsets here, scaled for min sensitivity */ // INPUT THE OFFSETS HERE
-  mpu.setXAccelOffset(633);
-  mpu.setYAccelOffset(2998);
-  mpu.setZAccelOffset(551);
-  mpu.setXGyroOffset(37);
-  mpu.setYGyroOffset(10);
-  mpu.setZGyroOffset(-21);
+  mpu.setXAccelOffset(662);
+  mpu.setYAccelOffset(2962);
+  mpu.setZAccelOffset(542);
+  mpu.setXGyroOffset(41);
+  mpu.setYGyroOffset(12);
+  mpu.setZGyroOffset(-20);
   /* Making sure it worked (returns 0 if so) */ 
   if (devStatus == 0) {
     mpu.CalibrateAccel(6);  // Calibration Time: generate offsets and calibrate our MPU6050
@@ -461,8 +467,35 @@ double PD_correction(double distanceLHS, double distanceRHS) {
   currentTime = millis();
   dt = (double)(currentTime - previousTime);
 
+  if ((distanceLHS < thresholdDistanceLHS) && (distanceRHS < thresholdDistanceRHS)) { // REQUIRES ADJUSTMENTS IF NEEDED
+    // Both walls are at expected distances, use both for localisation
+    //Serial.println("Both walls are detectable");
+      drift = distanceLHS - distanceRHS;
+      kp_internal = Kp;
+      kd_internal = Kd;
+    
+  } else if ((distanceRHS > thresholdDistanceRHS) && (distanceLHS <= thresholdDistanceRHS)) { 
+    // Left wall following:
+    //Serial.println("Left wall is detectable");
+      drift = distanceLHS - wallRef;
+      prev_error = 0.0;
+      kp_internal = Kp*1;
+      kd_internal = Kd*1;
+
+  } else if ((distanceLHS > thresholdDistanceRHS) && (distanceRHS <= thresholdDistanceRHS)) {
+    // Right Wall following:
+    //Serial.println("Right wall is detectable");
+      drift = wallRef - distanceRHS;
+      prev_error = 0.0;
+      kp_internal = Kp*1;
+      kd_internal = Kd*1;
+
+  } else {
+    Serial.println("distanceLHS & RHS are not accepted... >:( ");
+  }
+
   // Drift is the error signal
-  drift = distanceLHS - distanceRHS;
+  //drift = distanceLHS - distanceRHS;
   error = drift;
   deriv = (error - prev_error) / dt;
   integ += (error + prev_error) * dt;
@@ -475,14 +508,15 @@ double PD_correction(double distanceLHS, double distanceRHS) {
   }
 
   // PID Value
-  correction =  (Kd * deriv) + (Kp * error) + (Ki * integ);   // This will determine the servo velocities
+  correction =  (kd_internal * deriv) + (kp_internal * error) + (Ki * integ);   // This will determine the servo velocities
 
   // Store past values
   prev_error = error;
   previousTime = currentTime;
 
   // Debug statement, comment it to hide
-  //Serial.print(drift); Serial.print(", "); Serial.print(leftservoVal); Serial.print(", "); Serial.println(rightservoVal);
+  Serial.print(drift); Serial.print(", "); Serial.print(leftservoVal); Serial.print(", "); Serial.println(rightservoVal);
+  //Serial.print(drift); Serial.print(", "); Serial.print(distanceLHS); Serial.print(", "); Serial.println(distanceRHS);
   return correction;
 }
 
