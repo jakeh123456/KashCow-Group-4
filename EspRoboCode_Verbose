@@ -138,7 +138,7 @@ void loop(){
         distCheck();
       }
       inMaze = true;
-      logMsg = "LOG:Entered Maze"
+      logMsg = "LOG:Entered Maze";
       espSerial.println(logMsg);
       Serial.print(logMsg);
       Serial.println("");
@@ -364,7 +364,7 @@ void turn(bool dir, float turnAngle){
   else{
     Serial.print("Right \n");
     espSerial.println("LOG:Right Turn");
-    direction = r;
+    direction = 'r';
     WebUpdate();
 
     targAngle = initAngle + turnAngle;
