@@ -1,9 +1,10 @@
+
 //===================================================//
 //               Part B Robotics Project             //
 //                  Company D Group 4                //
 //       Esp Maze Solver - Grande (Serial enabled)   //
 //                                                   //
-//                       V 2.2                       //
+//                       V 2.3                       //
 //===================================================//
 
 //Include Libraries
@@ -66,11 +67,12 @@ uint8_t MPUIntStatus;
 uint8_t devStatus;
 uint16_t packetSize;
 volatile int run = 1;
-char direction = 'f'; // 'f', 'b', 'l', 'r' ESP
+char direction = 'F'; // 'f', 'b', 'l', 'r' ESP - Changed to uppercase by default
 float decimal1 = 12.3; // Replace with a metric (e.g., battery voltage)
 float decimal2 = 45.6; // Replace with a metric (e.g., speed)
 String logMsg = "No errors"; // ESP , Start with "LOG:<Msg content>" if its just a log 
 String errMsg = "No errors";  //
+String featureType = "PATH"; // Added for maze mapping: PATH, JUNCTION, T_JUNCTION, DEADEND, TURN
 
 //Define containers
 Quaternion q;
@@ -133,6 +135,7 @@ void loop(){
       espSerial.println(logMsg);
       Serial.print(logMsg);
       Serial.println("");
+      featureType = "START";
       forward();
       while(leftDist > 10 && rightDist > 10){
         distCheck();
@@ -151,6 +154,7 @@ void loop(){
       Serial.print(logMsg);
       Serial.println("");
       distCheck();
+      featureType = "PATH";
       if(rightDist <= sideThresh)slightLeft();
       if(leftDist <= sideThresh)slightRight();
       if(frontDist > 30 &&leftDist > uThresh && rightDist > uThresh){
@@ -160,6 +164,7 @@ void loop(){
           espSerial.println(logMsg);
           Serial.print(logMsg);
           Serial.println("");
+          featureType = "END";
           delay(1000);
           end();
         }
@@ -190,11 +195,13 @@ void loop(){
         Serial.print(rightDist);
         Serial.println("");
         deadend = run;
-        errMsg = "DeadEnd";
+        featureType = "DEADEND";
+        errMsg = "DEADEND";
         Serial.print("Deadend: ");
         Serial.print(deadend);
         Serial.println("");
         espSerial.println("LOG:Deadend: "+String(deadend));
+        WebUpdate(); // Make sure we send feature type before turning
         if(leftDist < rightDist) turn(false, 180);
         else turn(true, 180);
       }
@@ -213,11 +220,19 @@ void loop(){
         Serial.print("Right Distance: ");
         Serial.print(rightDist);
         Serial.println("");
-        if(leftDist < rightDist) turn(true, 90);
-        else turn(false, 90);
+        
+        if(leftDist < rightDist) {
+          featureType = "TURN_RIGHT";
+          WebUpdate(); // Make sure we send feature type before turning
+          turn(true, 90);
+        } else {
+          featureType = "TURN_LEFT";
+          WebUpdate(); // Make sure we send feature type before turning
+          turn(false, 90);
+        }
       }
       else{
-        logMsg = "LOG:T-Junction Detecte";
+        logMsg = "LOG:T-Junction Detected";
         espSerial.println(logMsg);
         Serial.println(logMsg);
         Serial.print("Current Params: ");
@@ -237,17 +252,26 @@ void loop(){
         Serial.print("Deadend: ");
         Serial.print(deadend);
         Serial.println("");
-        if(run == 1){ turn(false, 90);
-          espSerial.println("LOG:Run 1 so taking Left");}
+        
+        featureType = "T_JUNCTION";
+        WebUpdate(); // Make sure we send feature type before turning
+        
+        if(run == 1){ 
+          turn(false, 90);
+          espSerial.println("LOG:Run 1 so taking Left");
+        }
         else if(run == 2) {
           turn(true, 90);     
-          espSerial.println("LOG:Run 1 so taking Right");}
+          espSerial.println("LOG:Run 2 so taking Right");
+        }
         else if(deadend == 1){ 
           turn(true, 90);
-          espSerial.println("LOG:Run 3 taking correct route");}     
-        else if(deadend == 2){ turn(false, 90);
-          espSerial.println("LOG:Run 3 taking correct route");} 
-        
+          espSerial.println("LOG:Run 3 taking correct route");
+        }     
+        else if(deadend == 2){ 
+          turn(false, 90);
+          espSerial.println("LOG:Run 3 taking correct route");
+        } 
       }
     }
   }
@@ -272,7 +296,7 @@ void stop(){
 }
 
 void forward(){
-  direction = 'f';
+  direction = 'F';
   logMsg = "LOG:Robot Moving Forward";
   espSerial.println(logMsg);
   Serial.print("Forward");
@@ -332,7 +356,7 @@ void slightRight(){
 }
 
 void turn(bool dir, float turnAngle){
-  espSerial.println("LOG:Intiating Turn");
+  espSerial.println("LOG:Initiating Turn");
   Serial.print("Initiating Turn ");
   Serial.print(turnAngle);
   Serial.print("° \n");
@@ -341,7 +365,7 @@ void turn(bool dir, float turnAngle){
   const float initAngle = yaw;
   if(dir == false){
     Serial.print("Left \n");
-    direction = 'l';
+    direction = 'L';
     WebUpdate();
     espSerial.println("LOG:Left turn");
     
@@ -364,7 +388,7 @@ void turn(bool dir, float turnAngle){
   else{
     Serial.print("Right \n");
     espSerial.println("LOG:Right Turn");
-    direction = 'r';
+    direction = 'R';
     WebUpdate();
 
     targAngle = initAngle + turnAngle;
@@ -426,12 +450,11 @@ void WebUpdate(){
                  + direction + "," 
                  + String(decimal1, 1) + "," 
                  + String(decimal2, 1) + "," 
-                 + errMsg;
+                 + featureType;  // Using featureType instead of errMsg for maze mapping
 
   // Send to ESP
   espSerial.println(csvData);
-  Serial.println(csvData);  //DELETABLEE !
-
+  Serial.println(csvData);
 }
 
 void IMU() {
