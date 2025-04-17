@@ -1,10 +1,9 @@
-
 //===================================================//
 //               Part B Robotics Project             //
 //                  Company D Group 4                //
 //       Esp Maze Solver - Grande (Serial enabled)   //
 //                                                   //
-//                       V 2.3                       //
+//                       V 2.4                       //
 //===================================================//
 
 //Include Libraries
@@ -72,7 +71,7 @@ float decimal1 = 12.3; // Replace with a metric (e.g., battery voltage)
 float decimal2 = 45.6; // Replace with a metric (e.g., speed)
 String logMsg = "No errors"; // ESP , Start with "LOG:<Msg content>" if its just a log 
 String errMsg = "No errors";  //
-String featureType = "PATH"; // Added for maze mapping: PATH, JUNCTION, T_JUNCTION, DEADEND, TURN
+String featureType = "PATH"; // Added for maze mapping: PATH, JUNCTION, T_JUNCTION, DEADEND, TURN_LEFT, TURN_RIGHT
 
 //Define containers
 Quaternion q;
@@ -125,7 +124,8 @@ void setup(){
   Serial.println("");
   Serial.println("*------------------------------------------*");
   Serial.println("");
-
+  //
+  espSerial.println("IDENTITY:MazeRunner"); // Send identity message to ESP aka Name
 }
 
 void loop(){
@@ -296,7 +296,7 @@ void stop(){
 }
 
 void forward(){
-  direction = 'F';
+  direction = 'F'; // Using uppercase F
   logMsg = "LOG:Robot Moving Forward";
   espSerial.println(logMsg);
   Serial.print("Forward");
@@ -365,7 +365,7 @@ void turn(bool dir, float turnAngle){
   const float initAngle = yaw;
   if(dir == false){
     Serial.print("Left \n");
-    direction = 'L';
+    direction = 'L'; // Using uppercase L for Left
     WebUpdate();
     espSerial.println("LOG:Left turn");
     
@@ -388,7 +388,7 @@ void turn(bool dir, float turnAngle){
   else{
     Serial.print("Right \n");
     espSerial.println("LOG:Right Turn");
-    direction = 'R';
+    direction = 'R'; // Using uppercase R for Right
     WebUpdate();
 
     targAngle = initAngle + turnAngle;
