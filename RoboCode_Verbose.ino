@@ -120,6 +120,7 @@ void setup(){
 
 void loop(){
   if(digitalRead(enable) == HIGH && endRun == false){
+    digitalWrite(enableLED, HIGH);
     if(inMaze == false){
       Serial.print("Entering maze");
       Serial.println("");
@@ -225,6 +226,7 @@ void loop(){
   }
   
   if(digitalRead(enable) == LOW && endRun == true){
+    digitalWrite(enableLED, LOW);
     Serial.print("endRun = false");
     Serial.println("");
     endRun = false;
@@ -233,6 +235,7 @@ void loop(){
   }
 
   else{
+    digitalWrite(enableLED, LOW);
     stop();
   }
 }
