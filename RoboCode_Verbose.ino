@@ -46,7 +46,7 @@ Servo rw; //Right wheel servo
 
 //Define variables
 int deadend = 1;
-int frontThresh = 12; //7 for Mac
+int frontThresh = 12;
 int sideThresh = 4;
 int uThresh = 13;
 bool inMaze = false;
