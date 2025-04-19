@@ -2,7 +2,6 @@
 //               Part B Robotics Project             //
 //                  Company D Group 4                //
 //        Maze Solver - Verbose (Serial enabled)     //
-//                   Jake Hallworth                  //
 //                       V 2.1.8                     //
 //===================================================//
 
