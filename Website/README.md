@@ -42,3 +42,6 @@ Where:
     <log>: Optional log message to append
         If log message starts with "IDENTITY:" then this will be used for RobotName which will be seen on website
 
+
+# Extra
+  If your feeling like tinkering refer to ArduinoMessagingGuide which provides a bit more info on how messages are sent from the robot to esp. Good luck and enjoy!
