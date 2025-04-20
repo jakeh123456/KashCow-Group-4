@@ -1,6 +1,9 @@
 How to launch the website and server for the maze solver:
 
-# Step 1: Navigate to the project directory.
+# Step 1: Install Node.js
+Download and install Node.js from [https://nodejs.org/](https://nodejs.org/). Make sure to add Node.js to your system PATH.
+
+# Step 2: Navigate to the project directory.
 In your terminal with dir as KashCow-Group-4 type:
 ```
 cd Website
