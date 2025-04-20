@@ -3,7 +3,7 @@
 //                  Company D Group 4                //
 //       Esp Maze Solver - Grande (Serial enabled)   //
 //                                                   //
-//                       V 2.4                       //
+//                       V 2.4.1                      //
 //===================================================//
 
 //Include Libraries
@@ -130,6 +130,7 @@ void setup(){
 
 void loop(){
   if(digitalRead(enable) == HIGH && endRun == false){
+    digitalWrite(enableLED, HIGH);  
     if(inMaze == false){
       logMsg = "LOG:Entering maze";
       espSerial.println(logMsg);
@@ -277,6 +278,7 @@ void loop(){
   }
   
   if(digitalRead(enable) == LOW && endRun == true){
+    digitalWrite(enableLED, LOW);
     Serial.print("endRun = false");
     Serial.println("");
     endRun = false;
@@ -285,6 +287,7 @@ void loop(){
   }
 
   else{
+    digitalWrite(enableLED, LOW);
     stop();
   }
 }
