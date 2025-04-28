@@ -242,7 +242,8 @@ void handleLogMessage(char* logContent) {
 
 void handleIdentityMessage(char* identityContent) {
   // Update the robot name
-  robotName = String(identityContent).trim();
+  robotName = String(identityContent);
+  robotName.trim();
   
   // Send identity message to server
   String identityString = String(millis()) + ";0;0;0;0;0;0;;IDENTITY:" + robotName;
