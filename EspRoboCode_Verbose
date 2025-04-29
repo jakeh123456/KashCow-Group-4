@@ -3,7 +3,7 @@
 //                  Company D Group 4                //
 //       Esp Maze Solver - Grande (Serial enabled)   //
 //                                                   //
-//                       V 2.4.1                      //
+//                       V 2.4.2                      //
 //===================================================//
 
 //Include Libraries
@@ -49,7 +49,7 @@ SoftwareSerial espSerial(255, softSerial); // (no RX needed)
 
 //Define variables
 int deadend = 1;
-int frontThresh = 12; //7 for Mac
+int frontThresh = 13; //7 for Mac
 int sideThresh = 4;
 int uThresh = 13;
 bool inMaze = false;
@@ -82,7 +82,6 @@ VectorInt16 ggWorld;
 VectorFloat gravity;
 
 void setup(){
-
   //Set pin modes (not necessary - just to make sure)
   pinMode(run1LED, OUTPUT);
   pinMode(run2LED, OUTPUT);
@@ -114,16 +113,10 @@ void setup(){
   IMUInit();
 
   //Setup serial connection
-  Serial.begin(9600);
   espSerial.begin(9600); // UART to ESP
 
   //Confirm setup complete
   digitalWrite(initLED, HIGH);
-  Serial.println("");
-  Serial.print("Ready");
-  Serial.println("");
-  Serial.println("*------------------------------------------*");
-  Serial.println("");
   //
   espSerial.println("IDENTITY:MazeRunner"); // Send identity message to ESP aka Name
 }
@@ -134,8 +127,6 @@ void loop(){
     if(inMaze == false){
       logMsg = "LOG:Entering maze";
       espSerial.println(logMsg);
-      Serial.print(logMsg);
-      Serial.println("");
       featureType = "START";
       forward();
       while(leftDist > 10 && rightDist > 10){
@@ -144,16 +135,12 @@ void loop(){
       inMaze = true;
       logMsg = "LOG:Entered Maze";
       espSerial.println(logMsg);
-      Serial.print(logMsg);
-      Serial.println("");
     }
     distCheck();
     forward();
     while(frontDist > frontThresh){
       logMsg = "LOG:Proceed in Maze";
       espSerial.println(logMsg);
-      Serial.print(logMsg);
-      Serial.println("");
       distCheck();
       featureType = "PATH";
       if(rightDist <= sideThresh)slightLeft();
@@ -163,10 +150,8 @@ void loop(){
         if(frontDist > 30 &&leftDist > uThresh && rightDist > uThresh){
           logMsg = "LOG:Exiting maze...";
           espSerial.println(logMsg);
-          Serial.print(logMsg);
-          Serial.println("");
           featureType = "END";
-          delay(1000);
+          delay(200);
           end();
         }
       }
@@ -174,103 +159,64 @@ void loop(){
     if(endRun == false){
       logMsg = "LOG:Maze blocked";
       espSerial.println(logMsg);
-      Serial.print(logMsg);
-      Serial.println("");
-      Serial.print("Stop");
-      Serial.println("");
       stop();
 
       if(leftDist < uThresh && rightDist < uThresh){
-        logMsg = "LOG:DeadEnd detected";
-        espSerial.println(logMsg);
-        Serial.println(logMsg);
-        Serial.print("Current Params: ");
-        Serial.println("");
-        Serial.print("Front Distance: ");
-        Serial.print(frontDist);
-        Serial.println("");
-        Serial.print("Left Distance: ");
-        Serial.print(leftDist);
-        Serial.println("");
-        Serial.print("Right Distance: ");
-        Serial.print(rightDist);
-        Serial.println("");
-        deadend = run;
         featureType = "DEADEND";
-        errMsg = "DEADEND";
-        Serial.print("Deadend: ");
-        Serial.print(deadend);
-        Serial.println("");
+        WebUpdate();
+
+        deadend = run;
         espSerial.println("LOG:Deadend: "+String(deadend));
-        WebUpdate(); // Make sure we send feature type before turning
-        if(leftDist < rightDist) turn(false, 180);
-        else turn(true, 180);
+        
+        // Turn 180 degrees without sending another update
+        if(leftDist < rightDist) turn(false, 180, false);
+        else turn(true, 180, false);
+        
+        // After turn, send a special backtracking message
+        direction = 'B'; // Indicate backtrack
+        featureType = "BACKTRACK";
+        WebUpdate();
+        
+        // After backtracking, set direction to forward for next move
+        direction = '\0';
+        featureType = "";
+
       }
       else if(leftDist < uThresh || rightDist < uThresh){
         logMsg = "LOG:Turn Detected";
         espSerial.println(logMsg);
-        Serial.println(logMsg);
-        Serial.print("Current Params: ");
-        Serial.println("");
-        Serial.print("Front Distance: ");
-        Serial.print(frontDist);
-        Serial.println("");
-        Serial.print("Left Distance: ");
-        Serial.print(leftDist);
-        Serial.println("");
-        Serial.print("Right Distance: ");
-        Serial.print(rightDist);
-        Serial.println("");
         
         if(leftDist < rightDist) {
           featureType = "TURN_RIGHT";
           WebUpdate(); // Make sure we send feature type before turning
-          turn(true, 90);
+          turn(true, 90, false);
         } else {
           featureType = "TURN_LEFT";
           WebUpdate(); // Make sure we send feature type before turning
-          turn(false, 90);
+          turn(false, 90, false);
         }
       }
       else{
         logMsg = "LOG:T-Junction Detected";
         espSerial.println(logMsg);
-        Serial.println(logMsg);
-        Serial.print("Current Params: ");
-        Serial.println("");
-        Serial.print("Front Distance: ");
-        Serial.print(frontDist);
-        Serial.println("");
-        Serial.print("Left Distance: ");
-        Serial.print(leftDist);
-        Serial.println("");
-        Serial.print("Right Distance: ");
-        Serial.print(rightDist);
-        Serial.println("");
-        Serial.print("RUN: ");
-        Serial.print(run);
-        Serial.println("");
-        Serial.print("Deadend: ");
-        Serial.print(deadend);
-        Serial.println("");
         
         featureType = "T_JUNCTION";
         WebUpdate(); // Make sure we send feature type before turning
         
         if(run == 1){ 
-          turn(false, 90);
+          turn(false, 90,true);
           espSerial.println("LOG:Run 1 so taking Left");
         }
         else if(run == 2) {
-          turn(true, 90);     
+          turn(true, 90,true);     
           espSerial.println("LOG:Run 2 so taking Right");
         }
         else if(deadend == 1){ 
-          turn(true, 90);
+          turn(true, 90,true);
           espSerial.println("LOG:Run 3 taking correct route");
         }     
         else if(deadend == 2){ 
-          turn(false, 90);
+          turn(false, 90,true);
           espSerial.println("LOG:Run 3 taking correct route");
         } 
       }
@@ -279,8 +225,6 @@ void loop(){
   
   if(digitalRead(enable) == LOW && endRun == true){
     digitalWrite(enableLED, LOW);
-    Serial.print("endRun = false");
-    Serial.println("");
     endRun = false;
     inMaze = false;
     stop();
@@ -302,8 +246,6 @@ void forward(){
   direction = 'F'; // Using uppercase F
   logMsg = "LOG:Robot Moving Forward";
   espSerial.println(logMsg);
-  Serial.print("Forward");
-  Serial.println("");
   rw.attach(svr);
   lw.attach(svl);
   rw.write(1);
@@ -339,8 +281,6 @@ void rightSlow(){
 }
 
 void slightLeft(){
-  Serial.print("Left adjust");
-  Serial.println("");
   espSerial.println("LOG:Left adjust");
   lw.detach();
   delay(200); //200 on Mac
@@ -349,8 +289,6 @@ void slightLeft(){
 }
 
 void slightRight(){
-  Serial.print("Right adjust");
-  Serial.println("");
   espSerial.println("LOG:Right adjust");
   rw.detach();
   delay(200); //200 on Mac
@@ -358,19 +296,19 @@ void slightRight(){
   WebUpdate();
 }
 
-void turn(bool dir, float turnAngle){
+void turn(bool dir, float turnAngle, bool sendUpdate){
   espSerial.println("LOG:Initiating Turn");
-  Serial.print("Initiating Turn ");
-  Serial.print(turnAngle);
-  Serial.print("° \n");
   espSerial.println("LOG: "+String(turnAngle)+ "°");
   IMU();
   const float initAngle = yaw;
+  
   if(dir == false){
-    Serial.print("Left \n");
-    direction = 'L'; // Using uppercase L for Left
-    WebUpdate();
     espSerial.println("LOG:Left turn");
+    direction = 'L'; // Using uppercase L for Left
+    
+    if (sendUpdate) {
+      WebUpdate();
+    }
     
     targAngle = initAngle - turnAngle;
     if(targAngle <= 0){
@@ -384,15 +322,15 @@ void turn(bool dir, float turnAngle){
     while(abs(targAngle-yaw)>4){
       IMU();
     }
-    Serial.print("Stop");
-    Serial.println("");
     stop();
   }
   else{
-    Serial.print("Right \n");
     espSerial.println("LOG:Right Turn");
     direction = 'R'; // Using uppercase R for Right
-    WebUpdate();
+    
+    if (sendUpdate) {
+      WebUpdate();
+    }
 
     targAngle = initAngle + turnAngle;
     if(targAngle >= 360){
@@ -406,8 +344,6 @@ void turn(bool dir, float turnAngle){
     while(abs(targAngle-yaw)>3){
       IMU();
     }
-    Serial.print("Stop");
-    Serial.println("");
     stop();
   }
   espSerial.println("LOG:Turn Complete");
@@ -430,34 +366,24 @@ void distCheck(){
   if(leftDist < 0.9){if(rightDist < 14){leftDist = 13.5 - rightDist;}else {leftDist = (sideThresh + 0.1);}}
   if(rightDist < 0.9){if(leftDist < 14){rightDist = 13.5 - rightDist;}else {rightDist = (sideThresh + 0.1);}}
   
-
-  Serial.print("Front Distance: ");
-  Serial.print(frontDist);
-  Serial.println("");
-  Serial.print("Left Distance: ");
-  Serial.print(leftDist);
-  Serial.println("");
-  Serial.print("Right Distance: ");
-  Serial.print(rightDist);
-  Serial.println("");
   WebUpdate();
 }
 
 void WebUpdate(){
   unsigned long timestamp = millis();
-  // Format CSV
+  // Format CSV data, now including backtracking information
   String csvData = String(timestamp) + "," 
                  + String(frontDist, 1) + "," 
                  + String(leftDist, 1) + "," 
                  + String(rightDist, 1) + "," 
                  + direction + "," 
                  + String(decimal1, 1) + "," 
-                 + String(decimal2, 1) + "," 
-                 + featureType;  // Using featureType instead of errMsg for maze mapping
+                 + String(decimal2, 1) + ","
+                 + featureType;
 
   // Send to ESP
   espSerial.println(csvData);
-  Serial.println(csvData);
+  featureType = ""; // Clear feature type after sending
 }
 
 void IMU() {
@@ -469,16 +395,10 @@ void IMU() {
     mpu.dmpConvertToWorldFrame(&aaWorld, &aa, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
     yaw = (ypr[0] * RAD_TO_DEG) + 180.0;
-    Serial.print("Yaw: ");
-    Serial.print(yaw);
-    Serial.print("°");
-    Serial.println("");
   }
 }
 
 void IMUInit() {
-  Serial.print("Initialising IMU");
-  Serial.println("");
   #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
     Wire.begin();
     Wire.setClock(400000);
@@ -503,21 +423,16 @@ void IMUInit() {
     DMPReady = true;
     packetSize = mpu.dmpGetFIFOPacketSize();
   }
-  Serial.print("IMU Initialised");
-  Serial.println("");
   IMU();
 }
 
 void end(){
-  Serial.print("End run");
-  Serial.println("");
   stop();
   espSerial.println("LOG:END RUN");
   inMaze = false;
   endRun = true;
   frontDist = 1.00;
   while(digitalRead(enable)==HIGH){
-    Serial.println("Waiting for reset...");
     espSerial.println("LOG:Waiting for reset...");
     delay(1000);
   }
