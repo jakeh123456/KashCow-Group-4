@@ -160,8 +160,7 @@ void loop(){
       stop();
 
       if(leftDist < uThresh && rightDist < uThresh){
-        featureType = "DEADEND";
-        WebUpdate();
+        WebUpdate("DEADEND");
 
         deadend = run;
         espSerial.println("LOG:Deadend: "+String(deadend));
@@ -172,32 +171,27 @@ void loop(){
         
         // After turn, send a special backtracking message
         direction = 'B'; // Indicate backtrack
-        featureType = "BACKTRACK";
-        WebUpdate();
+        WebUpdate("BACKTRACK");
         
         // After backtracking, set direction to forward for next move
         direction = '\0';
-        featureType = "";
 
       }
       else if(leftDist < uThresh || rightDist < uThresh){
         espSerial.println("LOG:Turn Detected");
         
         if(leftDist < rightDist) {
-          featureType = "TURN_RIGHT";
-          WebUpdate(); // Make sure we send feature type before turning
+          WebUpdate("TURN_RIGHT"); // Make sure we send feature type before turning
           turn(true, 90, false);
         } else {
-          featureType = "TURN_LEFT";
-          WebUpdate(); // Make sure we send feature type before turning
+          WebUpdate("TURN_LEFT"); // Make sure we send feature type before turning
           turn(false, 90, false);
         }
       }
       else{
         espSerial.println("LOG:T-Junction Detected");
         
-        featureType = "T_JUNCTION";
-        WebUpdate(); // Make sure we send feature type before turning
+        WebUpdate("T_JUNCTION"); // Make sure we send feature type before turning
         
         if(run == 1){ 
           turn(false, 90,true);
@@ -218,7 +212,6 @@ void loop(){
          
       }
       direction = '\0';
-      featureType = "";
     }
   }
   
@@ -293,7 +286,8 @@ void slightRight(){
 }
 
 void turn(bool dir, float turnAngle, bool sendUpdate){
-  espSerial.println("LOG: Turning : "+String(turnAngle)+ "°");
+  espSerial.println("LOG:Initiating Turn");
+  espSerial.println("LOG: "+String(turnAngle)+ "°");
   IMU();
   const float initAngle = yaw;
   
@@ -365,7 +359,7 @@ void distCheck(){
   WebUpdate();
 }
 
-void WebUpdate(){
+void WebUpdate(String featureType = ::featureType) {
     unsigned long timestamp = millis();
     // Format CSV data, now including backtracking information
     String csvData = String(timestamp) + "," 
@@ -379,7 +373,6 @@ void WebUpdate(){
 
     // Send to ESP
     espSerial.println(csvData);
-  featureType = ""; // Clear feature type after sending
 }
 
 void IMU() {
