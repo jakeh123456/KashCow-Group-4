@@ -49,7 +49,7 @@ SoftwareSerial espSerial(255, softSerial); // (no RX needed)
 
 //Define variables
 int deadend = 1;
-int frontThresh = 13; //7 for Mac
+int frontThresh = 12; //7 for Mac
 int sideThresh = 4;
 int uThresh = 13;
 bool inMaze = false;
@@ -70,7 +70,6 @@ char direction = 'F'; // 'f', 'b', 'l', 'r' ESP - Changed to uppercase by defaul
 float decimal1 = 12.3; // Replace with a metric (e.g., battery voltage)
 float decimal2 = 45.6; // Replace with a metric (e.g., speed)
 String logMsg = "No errors"; // ESP , Start with "LOG:<Msg content>" if its just a log 
-String errMsg = "No errors";  //
 String featureType = "PATH"; // Added for maze mapping: PATH, JUNCTION, T_JUNCTION, DEADEND, TURN_LEFT, TURN_RIGHT
 
 //Define containers
@@ -138,22 +137,27 @@ void loop(){
     }
     distCheck();
     forward();
-    while(frontDist > frontThresh){
-      logMsg = "LOG:Proceed in Maze";
-      espSerial.println(logMsg);
-      distCheck();
-      featureType = "PATH";
-      if(rightDist <= sideThresh)slightLeft();
-      if(leftDist <= sideThresh)slightRight();
-      if(frontDist > 30 &&leftDist > uThresh && rightDist > uThresh){
-        delay(100);
+    while(frontDist > frontThresh && endRun == false){
+      if(digitalRead(enable) == HIGH){
+        logMsg = "LOG:Proceed in Maze";
+        espSerial.println(logMsg);
+        distCheck();
+        featureType = "PATH";
+        if(rightDist <= sideThresh)slightLeft();
+        if(leftDist <= sideThresh)slightRight();
         if(frontDist > 30 &&leftDist > uThresh && rightDist > uThresh){
-          logMsg = "LOG:Exiting maze...";
-          espSerial.println(logMsg);
-          featureType = "END";
           delay(200);
-          end();
+          if(frontDist > 30 &&leftDist > uThresh && rightDist > uThresh){
+            logMsg = "LOG:Exiting maze...";
+            espSerial.println(logMsg);
+            featureType = "END";
+            delay(400);
+            end();
+          }
         }
+      }
+      else{
+        end();
       }
     }
     if(endRun == false){
@@ -218,8 +222,11 @@ void loop(){
         else if(deadend == 2){ 
           turn(false, 90,true);
           espSerial.println("LOG:Run 3 taking correct route");
-        } 
+        }
+         
       }
+      direction = '\0';
+      featureType = "";
     }
   }
   
@@ -239,7 +246,6 @@ void loop(){
 void stop(){
   lw.detach();
   rw.detach();
-  errMsg = "Robot has stopped";
 }
 
 void forward(){
@@ -281,19 +287,18 @@ void rightSlow(){
 }
 
 void slightLeft(){
-  espSerial.println("LOG:Left adjust");
   lw.detach();
   delay(200); //200 on Mac
   lw.attach(svl);
-  WebUpdate();
+  espSerial.println("LOG:Left adjust");
 }
 
 void slightRight(){
-  espSerial.println("LOG:Right adjust");
+
   rw.detach();
   delay(200); //200 on Mac
   rw.attach(svr);
-  WebUpdate();
+  espSerial.println("LOG:Right adjust");
 }
 
 void turn(bool dir, float turnAngle, bool sendUpdate){
@@ -353,6 +358,7 @@ void runSelISR(){
   if(run == 1){run = 2; digitalWrite(run1LED, LOW); digitalWrite(run2LED, HIGH);}
   else if(run == 2){run = 3; digitalWrite(run2LED, LOW); digitalWrite(run3LED, HIGH);}
   else {run = 1; digitalWrite(run3LED, LOW); digitalWrite(run1LED, HIGH);}
+  delay(200);
 }
 
 void distCheck(){
@@ -432,8 +438,6 @@ void end(){
   inMaze = false;
   endRun = true;
   frontDist = 1.00;
-  while(digitalRead(enable)==HIGH){
-    espSerial.println("LOG:Waiting for reset...");
-    delay(1000);
-  }
+  espSerial.println("LOG:Waiting for reset...");
+  while(digitalRead(enable)==HIGH){}
 }
